@@ -631,13 +631,89 @@
 
         let isProcessingShare = false;
 
+        function getWMODescription(code) {
+            const codes = {
+                0: 'Céu limpo ☀️', 1: 'Quase limpo 🌤️', 2: 'Parcialmente nublado ⛅', 3: 'Nublado ☁️',
+                45: 'Neblina 🌫️', 48: 'Nevoeiro 🌫️', 51: 'Chuvisco leve 🌦️', 53: 'Chuvisco moderado 🌦️',
+                55: 'Chuvisco denso 🌧️', 61: 'Chuva leve 🌦️', 63: 'Chuva moderada 🌧️', 65: 'Chuva forte 🌧️',
+                80: 'Pancadas de chuva leve 🌦️', 81: 'Pancadas de chuva moderada 🌧️', 82: 'Pancadas violentas ⛈️',
+                95: 'Tempestade ⛈️', 96: 'Tempestade com granizo ⛈️', 99: 'Tempestade severa ⛈️'
+            };
+            return codes[code] || 'Indefinido ☁️';
+        }
+
+        function getWindDirection(deg) {
+            if (deg >= 337.5 || deg < 22.5) return 'N (Norte)';
+            if (deg >= 22.5 && deg < 67.5) return 'NE (Nordeste)';
+            if (deg >= 67.5 && deg < 112.5) return 'L (Leste)';
+            if (deg >= 112.5 && deg < 157.5) return 'SE (Sudeste)';
+            if (deg >= 157.5 && deg < 202.5) return 'S (Sul)';
+            if (deg >= 202.5 && deg < 247.5) return 'SO (Sudoeste)';
+            if (deg >= 247.5 && deg < 292.5) return 'O (Oeste)';
+            if (deg >= 292.5 && deg < 337.5) return 'NO (Noroeste)';
+            return '';
+        }
+
+        async function getWeatherForecast() {
+            try {
+                // Coordenadas exatas da fazenda em Morrinhos Novos
+                const lat = -4.1725085524108625;
+                const lon = -40.87679951982965;
+                // URL atualizada para buscar também a precipitação ATUAL (para saber se chove agora)
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,precipitation&hourly=precipitation_probability,precipitation&timezone=America%2FFortaleza&forecast_hours=4`;
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                const curr = data.current;
+                const temp = Math.round(curr.temperature_2m);
+                const humidity = Math.round(curr.relative_humidity_2m);
+                const windSpeed = Math.round(curr.wind_speed_10m);
+                const windDir = getWindDirection(curr.wind_direction_10m);
+                const weatherDesc = getWMODescription(curr.weather_code);
+                
+                // Lógica para verificar se está chovendo neste exato momento
+                const isRainingNow = curr.precipitation > 0 || [51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99].includes(curr.weather_code);
+                const rainStatus = isRainingNow ? 'Sim 🌧️' : 'Não 🚫';
+
+                let forecastText = `\n🌡️ *CLIMA ATUAL (AGORA)*\n`;
+                forecastText += `*Condição:* ${weatherDesc} (${temp}°C)\n`;
+                forecastText += `*Chovendo agora:* ${rainStatus}\n`;
+                forecastText += `*Umidade:* ${humidity}%\n`;
+                forecastText += `*Vento:* ${windSpeed} km/h sentido ${windDir}\n`;
+                
+                forecastText += `\n🌦️ *PREVISÃO PARA AS PRÓXIMAS HORAS*\n`;
+                forecastText += `📍 _Morrinhos Novos, Guaraciaba do Norte_\n`;
+                
+                for(let i=0; i<4; i++) {
+                    const time = new Date(data.hourly.time[i]);
+                    const hour = String(time.getHours()).padStart(2, '0') + 'h00';
+                    const prob = data.hourly.precipitation_probability[i];
+                    const mm = data.hourly.precipitation[i];
+                    
+                    let icon = '☁️'; // Padrão: Nublado
+                    if (mm === 0 && prob < 20) icon = '☀️'; // Sol
+                    else if (mm < 0.5 && prob < 40) icon = '🌤️'; // Sol com algumas nuvens
+                    else if (mm > 0 && mm <= 2.5) icon = '🌦️'; // Chuva leve / Garoa
+                    else if (mm > 2.5 && mm <= 10) icon = '🌧️'; // Chuva normal
+                    else if (mm > 10) icon = '⛈️'; // Chuva forte / Tempestade
+                    
+                    forecastText += `> ${icon} *${hour}* - Prob: ${prob}% (${mm}mm)\n`;
+                }
+                return forecastText;
+            } catch (error) {
+                console.error("Erro ao buscar previsão:", error);
+                return ""; // Retorna vazio se falhar para não travar o envio principal
+            }
+        }
+
         async function downloadAndShare() {
             if (isProcessingShare) return;
             isProcessingShare = true;
 
             const btnSpan = document.querySelector('button[onclick="confirmBeforeSend()"] span.hidden.sm\\:inline') || document.querySelector('button[onclick="confirmBeforeSend()"] span');
             const originalText = btnSpan.innerText; 
-            btnSpan.innerText = "Preparando Envio...";
+            btnSpan.innerText = "Consultando Clima...";
 
             try {
                 // Coleta de Dados
@@ -667,6 +743,12 @@
                 
                 if (notes.trim() !== '') {
                     shareText += `\n*Observações:* ${notes}\n`;
+                }
+
+                // Busca a previsão do tempo e adiciona ao texto
+                const weatherForecastText = await getWeatherForecast();
+                if(weatherForecastText) {
+                    shareText += weatherForecastText;
                 }
 
                 // --- ENVIO PARA O GOOGLE SHEETS ---
