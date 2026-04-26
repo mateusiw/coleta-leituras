@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Leitura de Pluviômetro SPG</title>
+    <title>Leitura de Pluviômetro e Energia SPG</title>
     
     <!-- Ícones Modernos -->
     <link rel="icon" type="image/png" href="https://img.icons8.com/fluency/512/rain.png">
     <link rel="apple-touch-icon" href="https://img.icons8.com/fluency/512/rain.png">
-    <link rel="manifest" href='data:application/manifest+json,{"name":"Pluviômetro SPG","short_name":"Chuva","start_url":".","display":"standalone","background_color":"#ffffff","theme_color":"#0ea5e9"}'>
+    <link rel="manifest" href='data:application/manifest+json,{"name":"Leituras SPG","short_name":"Leituras","start_url":".","display":"standalone","background_color":"#ffffff","theme_color":"#0ea5e9"}'>
     
     <meta name="theme-color" content="#0ea5e9">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Pluviômetro SPG">
+    <meta name="apple-mobile-web-app-title" content="Leituras SPG">
     
     <!-- Bibliotecas Externas -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -67,11 +67,11 @@
     <div class="bg-white border-b border-slate-200 px-4 py-3 flex justify-between items-center shadow-sm sticky top-0 z-40">
         <div class="flex items-center gap-3">
             <div class="w-8 h-8 rounded-lg shadow-sm border border-slate-100 bg-brand-50 flex items-center justify-center">
-                <i data-lucide="cloud-rain" class="w-5 h-5 text-brand-600"></i>
+                <i data-lucide="bar-chart-2" class="w-5 h-5 text-brand-600"></i>
             </div>
             <div>
                 <h1 class="text-sm font-bold text-slate-800 leading-tight">SPG</h1>
-                <p class="text-[10px] text-brand-600 font-bold uppercase tracking-wide">Controle Pluviométrico</p>
+                <p class="text-[10px] text-brand-600 font-bold uppercase tracking-wide">Controle de Leituras</p>
             </div>
         </div>
         <div class="flex gap-2">
@@ -91,13 +91,23 @@
         <!-- COLUNA DA ESQUERDA: FORMULÁRIO -->
         <div class="w-full lg:w-1/2 space-y-4">
 
+            <!-- SELETOR DE MODO (Pluviômetro / Energia) -->
+            <div class="bg-slate-200/70 p-1.5 rounded-xl flex gap-1 shadow-inner">
+                <button type="button" id="btnModeRain" onclick="setMode('pluviometro')" class="flex-1 py-2.5 px-4 text-sm font-black rounded-lg bg-white shadow-sm text-brand-600 transition-all border border-slate-200/50">
+                    🌧️ Pluviômetro
+                </button>
+                <button type="button" id="btnModeEnergy" onclick="setMode('energia')" class="flex-1 py-2.5 px-4 text-sm font-bold rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-300/50 transition-all">
+                    ⚡ Energia
+                </button>
+            </div>
+
             <!-- DADOS DO REGISTRO -->
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
-                    <i data-lucide="droplets" class="text-brand-500"></i> <span id="formTitleText">Nova Leitura</span>
+                    <i data-lucide="droplets" id="formIcon" class="text-brand-500"></i> <span id="formTitleText">Nova Leitura</span>
                 </h2>
                 
-                <form id="rainForm" class="space-y-4">
+                <form id="readingForm" class="space-y-4">
                     
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
@@ -122,7 +132,7 @@
                     </div>
 
                     <div>
-                        <label class="text-xs font-bold text-slate-500 uppercase mb-1 block">Local (Pluviômetro)</label>
+                        <label class="text-xs font-bold text-slate-500 uppercase mb-1 block">Local (Medidor)</label>
                         <select id="locationSelect" required onchange="handleLocationChange()" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none text-sm bg-white font-bold">
                             <option value="">Selecione o local...</option>
                             <option value="SPG Sede">SPG Sede</option>
@@ -134,8 +144,8 @@
                         </div>
                     </div>
 
-                    <!-- CAIXA DE MEDIÇÃO EM DESTAQUE -->
-                    <div class="bg-brand-50 border border-brand-200 rounded-xl p-5 mt-6 mb-2">
+                    <!-- CAIXA DE MEDIÇÃO PLUVIÔMETRO -->
+                    <div id="rainBox" class="bg-brand-50 border border-brand-200 rounded-xl p-5 mt-6 mb-2 transition-all">
                         <div class="flex flex-col items-center justify-center text-center">
                             <label class="text-sm font-black text-brand-800 uppercase tracking-widest mb-3">Volume Medido</label>
                             
@@ -150,14 +160,29 @@
                         </div>
                     </div>
 
+                    <!-- CAIXA DE MEDIÇÃO ENERGIA -->
+                    <div id="energyBox" class="bg-yellow-50 border border-yellow-200 rounded-xl p-5 mt-6 mb-2 hidden transition-all">
+                        <div class="flex flex-col items-center justify-center text-center">
+                            <label class="text-sm font-black text-yellow-800 uppercase tracking-widest mb-3">Leitura do Relógio</label>
+                            
+                            <div class="flex items-end justify-center gap-2 mb-4 w-full px-2">
+                                <input type="number" id="energyAmount" step="1" min="0" placeholder="0" oninput="updatePreview()" class="w-full max-w-[240px] h-16 text-center text-4xl sm:text-5xl font-black text-slate-800 border-2 border-yellow-300 rounded-xl focus:border-yellow-500 focus:ring-0 outline-none bg-white shadow-inner">
+                            </div>
+                            
+                            <div class="px-4 py-2 rounded-full text-xs font-bold bg-yellow-100 text-yellow-700 uppercase tracking-wider shadow-sm">
+                                Medição de Energia
+                            </div>
+                        </div>
+                    </div>
+
                     <div>
                         <label class="text-xs font-bold text-slate-500 uppercase mb-1 block">Observações (Opcional)</label>
-                        <input type="text" id="readingNotes" placeholder="Ex: Chuva acompanhada de ventos fortes..." oninput="updatePreview()" class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none">
+                        <input type="text" id="readingNotes" placeholder="Ex: Chuva acompanhada de ventos / Relógio trocado..." oninput="updatePreview()" class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none">
                     </div>
 
                     <div class="pt-4 border-t border-slate-100">
                         <label class="text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1 justify-between">
-                            <span class="flex items-center gap-1"><i data-lucide="camera" class="w-3 h-3"></i> Foto do Pluviômetro (Máx. 2)</span>
+                            <span class="flex items-center gap-1"><i data-lucide="camera" class="w-3 h-3"></i> Foto do Visor (Máx. 2)</span>
                             <span id="photoCounter" class="text-[10px] text-brand-600 font-bold bg-brand-50 px-2 py-0.5 rounded-full">0/2</span>
                         </label>
                         <input type="file" id="photoUpload" accept="image/*" multiple required onchange="handleImageUpload(event)" class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-slate-50 file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 transition-colors">
@@ -171,18 +196,18 @@
             <div id="report-card" class="w-full h-auto flex flex-col bg-white rounded-none shadow-2xl overflow-hidden border border-slate-100 relative">
                 
                 <!-- HEADER DO PREVIEW -->
-                <div class="bg-gradient-to-br from-brand-700 via-brand-600 to-brand-800 p-8 text-white relative overflow-hidden flex flex-col justify-start shrink-0 border-b border-brand-900">
+                <div id="previewHeader" class="bg-gradient-to-br from-brand-700 via-brand-600 to-brand-800 p-8 text-white relative overflow-hidden flex flex-col justify-start shrink-0 border-b border-brand-900 transition-colors duration-500">
                     <div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
-                    <i data-lucide="cloud-rain" class="absolute -right-4 top-1/2 -translate-y-1/2 w-32 h-32 z-0 opacity-10 text-white transform -rotate-12"></i>
+                    <i id="previewHeaderIcon" data-lucide="cloud-rain" class="absolute -right-4 top-1/2 -translate-y-1/2 w-32 h-32 z-0 opacity-10 text-white transform -rotate-12 transition-all"></i>
                     
                     <div class="relative z-10 w-full flex justify-between items-start"> 
                         <div>
                             <h2 class="text-2xl font-black leading-tight tracking-tight text-white uppercase">Boletim</h2>
-                            <p class="text-brand-200 text-sm font-medium">Leitura Pluviométrica</p>
+                            <p id="previewSubTitle" class="text-white/80 text-sm font-medium">Leitura Pluviométrica</p>
                         </div>
                         
                         <div class="text-right">
-                            <p class="text-xs text-brand-200 uppercase font-bold tracking-wider mb-1">Volume</p>
+                            <p id="previewTopLabel" class="text-xs text-white/80 uppercase font-bold tracking-wider mb-1">Volume</p>
                             <h3 class="text-3xl font-black text-white" id="previewAmount">0 mm</h3>
                         </div>
                     </div>
@@ -201,7 +226,7 @@
                         <div>
                             <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Data</p>
                             <p class="text-sm font-bold text-slate-700 flex items-center gap-1">
-                                <i data-lucide="calendar" class="w-3.5 h-3.5 text-brand-500"></i>
+                                <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-400"></i>
                                 <span id="previewDate">--/--/----</span>
                             </p>
                         </div>
@@ -209,12 +234,12 @@
                         <div>
                             <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Responsável</p>
                             <p class="text-sm font-bold text-slate-700 flex items-center gap-1">
-                                <i data-lucide="user" class="w-3.5 h-3.5 text-brand-500"></i>
+                                <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400"></i>
                                 <span id="previewUser">---</span>
                             </p>
                         </div>
 
-                        <div>
+                        <div id="previewClassificationWrapper">
                             <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Classificação</p>
                             <p class="text-sm font-bold text-slate-700">
                                 <span id="previewClassification" class="bg-slate-100 px-2 py-0.5 rounded border border-slate-200">Aguardando</span>
@@ -230,7 +255,7 @@
 
                     <!-- Área da Imagem -->
                     <div id="previewImageContainer" class="mt-4 hidden flex-col items-center w-full">
-                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2 w-full border-b border-slate-100 pb-1">Fotos do Pluviômetro</p>
+                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-2 w-full border-b border-slate-100 pb-1">Fotos Anexadas</p>
                         <div id="previewImagesGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
                             <!-- Imagens geradas pelo JS -->
                         </div>
@@ -240,7 +265,7 @@
 
                 <div class="bg-slate-100 p-3 text-center border-t border-slate-200 shrink-0 mt-auto">
                     <div class="flex justify-center items-center gap-2 text-[10px] text-slate-400 font-medium uppercase tracking-widest leading-relaxed">
-                        SPG • Monitoramento Climático
+                        SPG • Monitoramento Operacional
                     </div>
                 </div>
             </div>
@@ -291,8 +316,19 @@
         </div>
     </div>
 
+    <!-- MODAL DE CARREGAMENTO -->
+    <div id="loadingModal" class="fixed inset-0 bg-black/60 z-[70] hidden flex justify-center items-center backdrop-blur-sm transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 w-11/12 max-w-sm transform transition-all scale-100 flex flex-col items-center justify-center text-center">
+            <div class="animate-spin mb-4">
+                <i data-lucide="loader-2" class="h-10 w-10 text-brand-500"></i>
+            </div>
+            <h3 id="loadingTitle" class="text-lg font-black text-slate-800">Processando...</h3>
+            <p id="loadingText" class="text-sm text-slate-500 mt-2 font-medium">Aguarde um momento.</p>
+        </div>
+    </div>
+
     <!-- MODAL DE MENSAGEM -->
-    <div id="messageModal" class="fixed inset-0 bg-black/50 z-50 hidden flex justify-center items-center backdrop-blur-sm transition-opacity duration-300">
+    <div id="messageModal" class="fixed inset-0 bg-black/50 z-[80] hidden flex justify-center items-center backdrop-blur-sm transition-opacity duration-300">
         <div class="bg-white rounded-xl shadow-2xl p-6 w-11/12 max-w-sm transform transition-all scale-100 text-center">
             <div id="msgIconContainer" class="mx-auto flex items-center justify-center h-12 w-12 rounded-full mb-4"></div>
             <h3 id="msgTitle" class="text-lg font-bold text-slate-800"></h3>
@@ -302,7 +338,10 @@
     </div>
 
     <script>
-        let currentPhotosBase64 = [];
+        let photosRain = [];
+        let photosEnergy = [];
+        let currentPhotosBase64 = photosRain;
+        let currentMode = 'pluviometro'; // Modos: 'pluviometro' ou 'energia'
 
         // Inicialização
         document.addEventListener("DOMContentLoaded", () => {
@@ -311,7 +350,6 @@
             const dateInput = document.getElementById('readingDate');
             if (!dateInput.value) {
                 const today = new Date();
-                // Pegando a data local correta
                 const yyyy = today.getFullYear();
                 const mm = String(today.getMonth() + 1).padStart(2, '0');
                 const dd = String(today.getDate()).padStart(2, '0');
@@ -319,6 +357,71 @@
             }
             updatePreview();
         });
+
+        // Alternador de Modos (Pluviômetro vs Energia)
+        function setMode(mode) {
+            currentMode = mode;
+            const isEnergy = mode === 'energia';
+
+            const btnRain = document.getElementById('btnModeRain');
+            const btnEnergy = document.getElementById('btnModeEnergy');
+            const rainBox = document.getElementById('rainBox');
+            const energyBox = document.getElementById('energyBox');
+            const rainInput = document.getElementById('rainAmount');
+            const energyInput = document.getElementById('energyAmount');
+            const previewHeader = document.getElementById('previewHeader');
+
+            if (isEnergy) {
+                btnEnergy.className = "flex-1 py-2.5 px-4 text-sm font-black rounded-lg bg-white shadow-sm text-yellow-600 transition-all border border-slate-200/50";
+                btnRain.className = "flex-1 py-2.5 px-4 text-sm font-bold rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-300/50 transition-all";
+                
+                document.getElementById('formIcon').setAttribute('data-lucide', 'zap');
+                document.getElementById('formIcon').classList.replace('text-brand-500', 'text-yellow-500');
+                document.getElementById('formTitleText').innerText = "Leitura de Energia";
+                
+                rainBox.classList.add('hidden');
+                rainInput.removeAttribute('required');
+                
+                energyBox.classList.remove('hidden');
+                energyInput.setAttribute('required', 'required');
+
+                document.getElementById('previewClassificationWrapper').classList.add('hidden');
+                document.getElementById('previewHeaderIcon').setAttribute('data-lucide', 'zap');
+                
+                // Muda a cor do cabeçalho do Preview para amarelo/laranja
+                previewHeader.classList.remove('from-brand-700', 'via-brand-600', 'to-brand-800', 'border-brand-900');
+                previewHeader.classList.add('from-yellow-500', 'via-amber-500', 'to-orange-600', 'border-orange-700');
+
+            } else {
+                btnRain.className = "flex-1 py-2.5 px-4 text-sm font-black rounded-lg bg-white shadow-sm text-brand-600 transition-all border border-slate-200/50";
+                btnEnergy.className = "flex-1 py-2.5 px-4 text-sm font-bold rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-300/50 transition-all";
+                
+                document.getElementById('formIcon').setAttribute('data-lucide', 'droplets');
+                document.getElementById('formIcon').classList.replace('text-yellow-500', 'text-brand-500');
+                document.getElementById('formTitleText').innerText = "Nova Leitura";
+                
+                energyBox.classList.add('hidden');
+                energyInput.removeAttribute('required');
+                
+                rainBox.classList.remove('hidden');
+                rainInput.setAttribute('required', 'required');
+
+                document.getElementById('previewClassificationWrapper').classList.remove('hidden');
+                document.getElementById('previewHeaderIcon').setAttribute('data-lucide', 'cloud-rain');
+                
+                // Volta a cor do cabeçalho do Preview para azul
+                previewHeader.classList.remove('from-yellow-500', 'via-amber-500', 'to-orange-600', 'border-orange-700');
+                previewHeader.classList.add('from-brand-700', 'via-brand-600', 'to-brand-800', 'border-brand-900');
+            }
+            
+            // Troca o array de fotos ativo dependendo do modo
+            currentPhotosBase64 = isEnergy ? photosEnergy : photosRain;
+            document.getElementById('photoUpload').value = '';
+            renderPhotoPreviews();
+            
+            lucide.createIcons();
+            updatePreview();
+        }
 
         // Controle do Select de Usuário
         function handleUserChange() {
@@ -398,22 +501,20 @@
 
         // Atualiza a visualização do cartão da direita em tempo real
         function updatePreview() {
-            // Coleta de dados
+            const isEnergy = currentMode === 'energia';
+            
+            // Coleta de dados genéricos
             const dateVal = document.getElementById('readingDate').value;
-            const mm = document.getElementById('rainAmount').value;
             const location = getLocationName();
             const user = getUserName();
             const notes = document.getElementById('readingNotes').value;
 
-            // Formatar data
             let displayDate = "--/--/----";
             if (dateVal) {
                 const parts = dateVal.split('-');
                 displayDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
             }
 
-            // Atualiza valores do Preview
-            document.getElementById('previewAmount').innerText = mm ? `${mm} mm` : "0 mm";
             document.getElementById('previewDate').innerText = displayDate;
             document.getElementById('previewLocation').innerText = location || '---';
             document.getElementById('previewUser').innerText = user || '---';
@@ -426,17 +527,29 @@
                 document.getElementById('previewNotes').classList.remove('italic', 'text-slate-400');
             }
 
-            // Atualiza Classificação no Preview
-            const previewBadge = document.getElementById('previewClassification');
-            if (mm === "") {
-                previewBadge.className = "bg-slate-100 px-2 py-0.5 rounded border border-slate-200";
-                previewBadge.innerText = "Aguardando";
+            // Valores Específicos por Modo
+            if (isEnergy) {
+                const kwh = document.getElementById('energyAmount').value;
+                document.getElementById('previewAmount').innerText = kwh ? kwh : "0";
+                document.getElementById('previewSubTitle').innerText = "Medição de Energia";
+                document.getElementById('previewTopLabel').innerText = "Leitura";
             } else {
-                const classification = getRainClassification(mm);
-                // Extraindo a cor principal (ex: bg-blue-100 -> blue)
-                const colorCode = classification.colorClass.split(' ')[0].split('-')[1];
-                previewBadge.className = `bg-${colorCode}-100 text-${colorCode}-700 px-2 py-0.5 rounded border border-${colorCode}-200 font-black`;
-                previewBadge.innerText = classification.text;
+                const mm = document.getElementById('rainAmount').value;
+                document.getElementById('previewAmount').innerText = mm ? `${mm} mm` : "0 mm";
+                document.getElementById('previewSubTitle').innerText = "Leitura Pluviométrica";
+                document.getElementById('previewTopLabel').innerText = "Volume";
+                
+                // Atualiza Classificação no Preview (só chuva)
+                const previewBadge = document.getElementById('previewClassification');
+                if (mm === "") {
+                    previewBadge.className = "bg-slate-100 px-2 py-0.5 rounded border border-slate-200";
+                    previewBadge.innerText = "Aguardando";
+                } else {
+                    const classification = getRainClassification(mm);
+                    const colorCode = classification.colorClass.split(' ')[0].split('-')[1];
+                    previewBadge.className = `bg-${colorCode}-100 text-${colorCode}-700 px-2 py-0.5 rounded border border-${colorCode}-200 font-black`;
+                    previewBadge.innerText = classification.text;
+                }
             }
         }
 
@@ -480,7 +593,6 @@
                     const img = new Image();
                     img.onload = function() {
                         const canvas = document.createElement('canvas');
-                        // Resolução máxima em HD para telefones
                         const MAX_WIDTH = 2160; const MAX_HEIGHT = 3840;
                         let width = img.width; let height = img.height;
                         
@@ -505,15 +617,17 @@
             
             const imgContainer = document.getElementById('previewImageContainer');
             const grid = document.getElementById('previewImagesGrid');
+            const uploadBtn = document.getElementById('photoUpload');
             
             if (currentPhotosBase64.length === 0) {
                 imgContainer.classList.add('hidden');
                 imgContainer.classList.remove('flex');
                 grid.innerHTML = '';
-                document.getElementById('photoUpload').setAttribute('required', 'required');
+                uploadBtn.setAttribute('required', 'required');
                 return;
             }
             
+            uploadBtn.removeAttribute('required');
             imgContainer.classList.remove('hidden');
             imgContainer.classList.add('flex');
             
@@ -546,12 +660,14 @@
         }
 
         function executeClear() {
-            document.getElementById('rainForm').reset();
+            document.getElementById('readingForm').reset();
             
             document.getElementById('customLocationContainer').classList.add('hidden');
             document.getElementById('customUserContainer').classList.add('hidden');
             
-            currentPhotosBase64 = [];
+            photosRain = [];
+            photosEnergy = [];
+            currentPhotosBase64 = currentMode === 'energia' ? photosEnergy : photosRain;
             renderPhotoPreviews();
             
             const dateInput = document.getElementById('readingDate');
@@ -606,7 +722,7 @@
 
         // Envio do Relatório
         function confirmBeforeSend() {
-            const form = document.getElementById('rainForm');
+            const form = document.getElementById('readingForm');
             
             if (!form.checkValidity()) {
                 form.reportValidity();
@@ -614,7 +730,7 @@
             }
             
             if (currentPhotosBase64.length === 0) {
-                showMessageModal('Foto Ausente', 'Por favor, anexe a foto do pluviômetro antes de enviar.', 'error');
+                showMessageModal('Foto Ausente', 'Por favor, anexe a foto da leitura antes de enviar.', 'error');
                 return;
             }
 
@@ -627,6 +743,17 @@
         function executeSend() { 
             hideConfirmModal(); 
             downloadAndShare(); 
+        }
+
+        function showLoadingModal(title, text) {
+            document.getElementById('loadingTitle').innerText = title;
+            document.getElementById('loadingText').innerText = text;
+            document.getElementById('loadingModal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function hideLoadingModal() {
+            document.getElementById('loadingModal').classList.add('hidden');
         }
 
         let isProcessingShare = false;
@@ -656,10 +783,8 @@
 
         async function getWeatherForecast() {
             try {
-                // Coordenadas exatas da fazenda em Morrinhos Novos
                 const lat = -4.1725085524108625;
                 const lon = -40.87679951982965;
-                // URL atualizada para buscar também a precipitação ATUAL (para saber se chove agora)
                 const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,precipitation&hourly=precipitation_probability,precipitation&timezone=America%2FFortaleza&forecast_hours=4`;
                 
                 const response = await fetch(url);
@@ -672,7 +797,6 @@
                 const windDir = getWindDirection(curr.wind_direction_10m);
                 const weatherDesc = getWMODescription(curr.weather_code);
                 
-                // Lógica para verificar se está chovendo neste exato momento
                 const isRainingNow = curr.precipitation > 0 || [51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99].includes(curr.weather_code);
                 const rainStatus = isRainingNow ? 'Sim 🌧️' : 'Não 🚫';
 
@@ -691,19 +815,19 @@
                     const prob = data.hourly.precipitation_probability[i];
                     const mm = data.hourly.precipitation[i];
                     
-                    let icon = '☁️'; // Padrão: Nublado
-                    if (mm === 0 && prob < 20) icon = '☀️'; // Sol
-                    else if (mm < 0.5 && prob < 40) icon = '🌤️'; // Sol com algumas nuvens
-                    else if (mm > 0 && mm <= 2.5) icon = '🌦️'; // Chuva leve / Garoa
-                    else if (mm > 2.5 && mm <= 10) icon = '🌧️'; // Chuva normal
-                    else if (mm > 10) icon = '⛈️'; // Chuva forte / Tempestade
+                    let icon = '☁️'; 
+                    if (mm === 0 && prob < 20) icon = '☀️'; 
+                    else if (mm < 0.5 && prob < 40) icon = '🌤️'; 
+                    else if (mm > 0 && mm <= 2.5) icon = '🌦️'; 
+                    else if (mm > 2.5 && mm <= 10) icon = '🌧️'; 
+                    else if (mm > 10) icon = '⛈️'; 
                     
                     forecastText += `> ${icon} *${hour}* - Prob: ${prob}% (${mm}mm)\n`;
                 }
                 return forecastText;
             } catch (error) {
                 console.error("Erro ao buscar previsão:", error);
-                return ""; // Retorna vazio se falhar para não travar o envio principal
+                return ""; 
             }
         }
 
@@ -713,61 +837,124 @@
 
             const btnSpan = document.querySelector('button[onclick="confirmBeforeSend()"] span.hidden.sm\\:inline') || document.querySelector('button[onclick="confirmBeforeSend()"] span');
             const originalText = btnSpan.innerText; 
-            btnSpan.innerText = "Consultando Clima...";
+            
+            const isEnergy = currentMode === 'energia';
 
             try {
-                // Coleta de Dados
+                // Coleta de Dados Genéricos
                 const dateVal = document.getElementById('readingDate').value;
                 const location = getLocationName();
                 const user = getUserName();
-                const mm = document.getElementById('rainAmount').value;
-                const classification = getRainClassification(mm).text;
                 const notes = document.getElementById('readingNotes').value;
                 
                 const dateObj = new Date(dateVal + "T00:00:00");
                 const displayDate = dateObj.toLocaleDateString('pt-BR');
                 const now = new Date();
-                const timeString = now.toLocaleTimeString('pt-BR'); // Captura HH:MM:SS
+                const timeString = now.toLocaleTimeString('pt-BR');
                 
-                const filenameBase = `Pluviometro - ${location} - ${displayDate.replace(/\//g, '-')}`;
+                let shareText = '';
+                let filenameBase = '';
+                let payload = {};
 
-                // Formatação do Texto do WhatsApp
-                let shareText = `🌧️ *BOLETIM PLUVIOMÉTRICO SPG* 🌧️\n\n`;
-                shareText += `*Data da Leitura:* ${displayDate} às ${timeString}\n`;
-                shareText += `*Local:* ${location}\n`;
-                shareText += `*Responsável:* ${user}\n\n`;
-                
-                shareText += `📊 *RESULTADO DA MEDIÇÃO*\n`;
-                shareText += `*Volume Medido:* ${mm} mm\n`;
-                shareText += `*Classificação:* ${classification}\n`;
-                
-                if (notes.trim() !== '') {
-                    shareText += `\n*Observações:* ${notes}\n`;
+                // Preparar dados com base no MODO
+                if (isEnergy) {
+                    btnSpan.innerText = "Calculando Consumo...";
+                    showLoadingModal("Calculando Consumo...", "Consultando a planilha de energia.");
+                    
+                    const kwh = document.getElementById('energyAmount').value;
+                    filenameBase = `Energia - ${location} - ${displayDate.replace(/\//g, '-')}`;
+
+                    let consumoText = "";
+                    try {
+                        // URL Exclusiva para a Planilha de Energia
+                        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwdcKr5TjUo2n81BJXFwX9lB8LS3Vfe2jBGoEr2jyWf5MvSBgi8SHtaFvNHe6q8pgY3pA/exec";
+                        const response = await fetch(`${SCRIPT_URL}?action=calcEnergy&reading=${kwh}`);
+                        const result = await response.json();
+
+                        if (result && result.consumo !== undefined) {
+                            consumoText += `*Consumo (24h):* ${result.consumo} kWh\n`;
+                            
+                            if (result.percentual !== undefined && result.ultimos.length > 0) {
+                                const perc = result.percentual;
+                                if (perc > 0) {
+                                    consumoText += `📈 *Aumento de ${perc.toFixed(1)}%* em relação a ontem.\n`;
+                                } else if (perc < 0) {
+                                    consumoText += `📉 *Queda de ${Math.abs(perc).toFixed(1)}%* em relação a ontem.\n`;
+                                } else {
+                                    consumoText += `⚖️ *Consumo manteve-se igual* a ontem.\n`;
+                                }
+                                consumoText += `\n*Últimos 5 consumos:*\n${result.ultimos.join('\n')}\n`;
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Erro ao puxar consumo do Apps Script:", e);
+                    }
+
+                    shareText = `⚡ *LEITURA DE ENERGIA SPG* ⚡\n\n`;
+                    shareText += `*Data da Leitura:* ${displayDate} às ${timeString}\n`;
+                    shareText += `*Local:* ${location}\n`;
+                    shareText += `*Responsável:* ${user}\n\n`;
+                    shareText += `📋 *DADOS DA LEITURA*\n`;
+                    shareText += `*Leitura Registrada:* ${kwh}\n`;
+                    
+                    if (consumoText !== "") {
+                        shareText += `\n${consumoText}`;
+                    }
+
+                    if (notes.trim() !== '') {
+                        shareText += `\n*Observações:* ${notes}\n`;
+                    }
+
+                } else {
+                    btnSpan.innerText = "Consultando Clima...";
+                    showLoadingModal("Consultando Clima...", "Buscando previsão para as próximas horas.");
+                    
+                    const mm = document.getElementById('rainAmount').value;
+                    const classification = getRainClassification(mm).text;
+                    filenameBase = `Pluviometro - ${location} - ${displayDate.replace(/\//g, '-')}`;
+
+                    shareText = `🌧️ *BOLETIM PLUVIOMÉTRICO SPG* 🌧️\n\n`;
+                    shareText += `*Data da Leitura:* ${displayDate} às ${timeString}\n`;
+                    shareText += `*Local:* ${location}\n`;
+                    shareText += `*Responsável:* ${user}\n\n`;
+                    shareText += `📊 *RESULTADO DA MEDIÇÃO*\n`;
+                    shareText += `*Volume Medido:* ${mm} mm\n`;
+                    shareText += `*Classificação:* ${classification}\n`;
+                    
+                    if (notes.trim() !== '') {
+                        shareText += `\n*Observações:* ${notes}\n`;
+                    }
+
+                    // Busca a previsão do tempo apenas para chuva
+                    const weatherForecastText = await getWeatherForecast();
+                    if(weatherForecastText) {
+                        shareText += weatherForecastText;
+                    }
+
+                    payload = {
+                        date: displayDate,
+                        time: timeString,
+                        location: location,
+                        user: user,
+                        volume_mm: mm,
+                        classification: classification,
+                        notes: notes
+                    };
                 }
 
-                // Busca a previsão do tempo e adiciona ao texto
-                const weatherForecastText = await getWeatherForecast();
-                if(weatherForecastText) {
-                    shareText += weatherForecastText;
+                // --- ENVIO PARA O GOOGLE SHEETS (Apenas Pluviômetro) ---
+                if (!isEnergy) {
+                    sendDataToGoogleSheets(payload);
                 }
-
-                // --- ENVIO PARA O GOOGLE SHEETS ---
-                const payload = {
-                    date: displayDate,
-                    time: timeString,
-                    location: location,
-                    user: user,
-                    volume_mm: mm,
-                    classification: classification,
-                    notes: notes
-                };
-                
-                sendDataToGoogleSheets(payload);
 
                 // Tratamento de Imagens
                 let finalImageBase64 = currentPhotosBase64[0];
                 if (currentPhotosBase64.length > 1) {
                     btnSpan.innerText = "Mesclando Imagens...";
+                    if(!document.getElementById('loadingModal').classList.contains('hidden')) {
+                        document.getElementById('loadingTitle').innerText = "Mesclando Imagens...";
+                        document.getElementById('loadingText').innerText = "Preparando o boletim final.";
+                    }
                     finalImageBase64 = await mergeImagesVertically(currentPhotosBase64);
                 }
 
@@ -792,12 +979,13 @@
                 showMessageModal('Erro', 'Falha ao preparar o registro.', 'error'); 
             } finally { 
                 if(btnSpan) btnSpan.innerText = originalText; 
+                hideLoadingModal();
                 isProcessingShare = false;
             }
         }
 
         async function sendDataToGoogleSheets(payload) {
-            // URL configurada do Apps Script - Atualize se for criar uma nova planilha para as chuvas
+            // URL configurada do Apps Script
             const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxthYEVkpX5aGi-a6pZL17CquWjgnVGQ10d5Ob_YmrblgBFsv3GFrApPLunRn_D72tMXQ/exec"; 
             
             if (!SCRIPT_URL || SCRIPT_URL === "SUA_URL_DO_APPS_SCRIPT_AQUI") {
