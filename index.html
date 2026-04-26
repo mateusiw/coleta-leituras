@@ -996,7 +996,11 @@
                 const file = new File([imgBlob], `${filenameBase}.jpg`, { type: 'image/jpeg' });
                 const filesArray = [file];
 
-                // ROTINA DE COMPARTILHAMENTO CORRIGIDA PARA O ESTADO ORIGINAL
+                // --- ALTERAÇÃO AQUI: Esconder o modal antes de chamar o compartilhamento ---
+                hideLoadingModal();
+                if(btnSpan) btnSpan.innerText = originalText;
+
+                // ROTINA DE COMPARTILHAMENTO
                 if (navigator.share && navigator.canShare && navigator.canShare({ files: filesArray })) { 
                     try {
                         await navigator.share({ files: filesArray, title: filenameBase, text: shareText }); 
@@ -1005,7 +1009,7 @@
                     }
                 } else { 
                     downloadFile(finalImageBase64, file.name);
-                    setTimeout(() => { window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank'); }, 1500); 
+                    setTimeout(() => { window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank'); }, 500); 
                 }
             } catch (err) { 
                 console.error(err);
