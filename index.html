@@ -327,13 +327,34 @@
         </div>
     </div>
 
-    <!-- MODAL DE MENSAGEM -->
+    <!-- MODAL DE MENSAGEM (ERROS) -->
     <div id="messageModal" class="fixed inset-0 bg-black/50 z-[80] hidden flex justify-center items-center backdrop-blur-sm transition-opacity duration-300">
         <div class="bg-white rounded-xl shadow-2xl p-6 w-11/12 max-w-sm transform transition-all scale-100 text-center">
             <div id="msgIconContainer" class="mx-auto flex items-center justify-center h-12 w-12 rounded-full mb-4"></div>
             <h3 id="msgTitle" class="text-lg font-bold text-slate-800"></h3>
             <p id="msgText" class="text-sm text-slate-500 mt-2 mb-4"></p>
             <button onclick="hideMessageModal()" class="w-full px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg text-sm transition-colors">OK</button>
+        </div>
+    </div>
+
+    <!-- MODAL DE PRONTO PARA COMPARTILHAR (FALLBACK) -->
+    <div id="shareReadyModal" class="fixed inset-0 bg-black/60 z-[90] hidden flex justify-center items-center backdrop-blur-sm transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 w-11/12 max-w-sm transform transition-all scale-100 text-center">
+            <div class="mx-auto flex items-center justify-center h-14 w-14 rounded-full bg-green-50 mb-4">
+                <i data-lucide="check-circle-2" class="h-8 w-8 text-green-600"></i>
+            </div>
+            <h3 class="text-xl font-black text-slate-800 text-center">Tudo Pronto!</h3>
+            <p class="text-sm text-slate-500 mt-3 text-center leading-relaxed font-medium">
+                Os dados foram processados e registrados com sucesso.<br>Clique abaixo para abrir o WhatsApp.
+            </p>
+            <div class="mt-6 flex flex-col gap-3">
+                <button onclick="executeFinalShare()" class="w-full px-4 py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-brand-600/20 active:scale-95 uppercase flex items-center justify-center gap-2">
+                    <i data-lucide="share-2" class="w-4 h-4"></i> Compartilhar
+                </button>
+                <button onclick="hideShareReadyModal()" class="w-full px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-sm transition-colors uppercase">
+                    Fechar
+                </button>
+            </div>
         </div>
     </div>
 
@@ -720,6 +741,42 @@
             });
         }
 
+        // --- FUNÇÕES DE CONTROLE DE MODAIS E COMPARTILHAMENTO DE SEGURANÇA ---
+        let pendingShareData = null;
+
+        function showShareReadyModal(base64, filename, text, filesArray) {
+            pendingShareData = { base64, filename, text, filesArray };
+            document.getElementById('shareReadyModal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function hideShareReadyModal() {
+            document.getElementById('shareReadyModal').classList.add('hidden');
+            pendingShareData = null;
+        }
+
+        async function executeFinalShare() {
+            if (!pendingShareData) return;
+            const { base64, filename, text, filesArray } = pendingShareData;
+            
+            // Tentativa nativa com o "clique novo" do usuário
+            if (filesArray && navigator.share && navigator.canShare && navigator.canShare({ files: filesArray })) {
+                try {
+                    await navigator.share({ files: filesArray, title: filename, text: text });
+                    hideShareReadyModal();
+                    return; // Sucesso, finaliza a execução
+                } catch (err) {
+                    console.log("Falha no share nativo pelo botão pronto:", err);
+                    if (err.name === 'AbortError') return; // Usuário apenas fechou o popup, não faz nada
+                }
+            }
+            
+            // Fallback direto e garantido para quando a função do sistema não suporta imagens
+            downloadFile(base64, filename + '.jpg');
+            window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+            hideShareReadyModal();
+        }
+
         // Envio do Relatório
         function confirmBeforeSend() {
             const form = document.getElementById('readingForm');
@@ -996,21 +1053,26 @@
                 const file = new File([imgBlob], `${filenameBase}.jpg`, { type: 'image/jpeg' });
                 const filesArray = [file];
 
-                // --- ALTERAÇÃO AQUI: Esconder o modal antes de chamar o compartilhamento ---
+                // Limpa a tela antes de abrir o popup ou o modal final
                 hideLoadingModal();
                 if(btnSpan) btnSpan.innerText = originalText;
 
-                // ROTINA DE COMPARTILHAMENTO
+                // TENTA COMPARTILHAR IMEDIATAMENTE
                 if (navigator.share && navigator.canShare && navigator.canShare({ files: filesArray })) { 
                     try {
                         await navigator.share({ files: filesArray, title: filenameBase, text: shareText }); 
                     } catch (shareErr) {
-                        console.log("Compartilhamento cancelado ou falhou:", shareErr);
+                        console.log("Compartilhamento nativo não completou:", shareErr);
+                        // SE O NAVEGADOR BLOQUEAR (TIMEOUT/PERMISSÃO), MOSTRA O MODAL "TUDO PRONTO"
+                        if (shareErr.name !== 'AbortError') {
+                            showShareReadyModal(finalImageBase64, filenameBase, shareText, filesArray);
+                        }
                     }
                 } else { 
-                    downloadFile(finalImageBase64, file.name);
-                    setTimeout(() => { window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank'); }, 500); 
+                    // SE O DISPOSITIVO NÃO SUPORTA SHARE DE ARQUIVOS, MOSTRA O MODAL "TUDO PRONTO"
+                    showShareReadyModal(finalImageBase64, filenameBase, shareText, filesArray);
                 }
+
             } catch (err) { 
                 console.error(err);
                 showMessageModal('Erro', 'Falha ao preparar o registro.', 'error'); 
