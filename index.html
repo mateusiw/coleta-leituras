@@ -919,24 +919,35 @@
                     const classification = getRainClassification(mm).text;
                     filenameBase = `Pluviometro - ${location} - ${displayDate.replace(/\//g, '-')}`;
 
-                    btnSpan.innerText = "Calculando Acumulado...";
-                    showLoadingModal("Calculando Chuva...", "Consultando o total acumulado do mês.");
+                    btnSpan.innerText = "Consultando Dados...";
+                    showLoadingModal("Consultando Dados...", "Aguarde, processando previsão e acumulado.");
 
                     let acumuladoText = "";
+                    let weatherForecastText = "";
+                    
                     try {
                         const SCRIPT_URL_CHUVA = "https://script.google.com/macros/s/AKfycbxthYEVkpX5aGi-a6pZL17CquWjgnVGQ10d5Ob_YmrblgBFsv3GFrApPLunRn_D72tMXQ/exec";
-                        const response = await fetch(`${SCRIPT_URL_CHUVA}?action=calcRain&date=${encodeURIComponent(displayDate)}&mm=${mm}`);
-                        const result = await response.json();
+                        
+                        // DISPARA AS DUAS CONSULTAS SIMULTANEAMENTE PARA NÃO DAR TIMEOUT
+                        const promiseAcumulado = fetch(`${SCRIPT_URL_CHUVA}?action=calcRain&date=${encodeURIComponent(displayDate)}&mm=${mm}`)
+                            .then(res => res.json())
+                            .catch(e => { console.error("Erro chuva:", e); return null; });
+                            
+                        const promiseClima = getWeatherForecast();
 
-                        if (result && result.acumuladoMes !== undefined) {
-                            acumuladoText = `*Total Acumulado (${displayMonth}):* ${result.acumuladoMes} mm\n`;
+                        // O código aguarda as duas finalizarem ao mesmo tempo, reduzindo pela metade o tempo de espera
+                        const [resultAcumulado, resultClima] = await Promise.all([promiseAcumulado, promiseClima]);
+
+                        if (resultAcumulado && resultAcumulado.acumuladoMes !== undefined) {
+                            acumuladoText = `*Total Acumulado (${displayMonth}):* ${resultAcumulado.acumuladoMes} mm\n`;
+                        }
+                        
+                        if (resultClima) {
+                            weatherForecastText = resultClima;
                         }
                     } catch (e) {
-                        console.error("Erro ao puxar acumulado de chuva:", e);
+                        console.error("Erro ao puxar dados da chuva:", e);
                     }
-
-                    btnSpan.innerText = "Consultando Clima...";
-                    showLoadingModal("Consultando Clima...", "Buscando previsão para as próximas horas.");
 
                     shareText = `🌧️ *BOLETIM PLUVIOMÉTRICO SPG* 🌧️\n\n`;
                     shareText += `*Data da Leitura:* ${displayDate} às ${timeString}\n`;
@@ -955,8 +966,6 @@
                         shareText += `\n*Observações:* ${notes}\n`;
                     }
 
-                    // Busca a previsão do tempo apenas para chuva
-                    const weatherForecastText = await getWeatherForecast();
                     if(weatherForecastText) {
                         shareText += weatherForecastText;
                     }
@@ -975,7 +984,7 @@
 
                 // --- ENVIO PARA O GOOGLE SHEETS (Apenas Pluviômetro) ---
                 if (!isEnergy) {
-                    sendDataToGoogleSheets(payload);
+                    sendDataToGoogleSheets(payload); // Não usa "await" propositalmente para não travar a tela
                 }
 
                 // Tratamento de Imagens
@@ -1000,10 +1009,15 @@
                         await navigator.share({ files: filesArray, title: filenameBase, text: shareText }); 
                     } catch (shareErr) {
                         console.log("Compartilhamento cancelado ou falhou:", shareErr);
+                        // FALLBACK: Se o navegador der Timeout e bloquear o Popup, força abrir o Whatsapp Direto!
+                        if (shareErr.name !== 'AbortError') { 
+                            downloadFile(finalImageBase64, file.name);
+                            setTimeout(() => { window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank'); }, 500); 
+                        }
                     }
                 } else { 
                     downloadFile(finalImageBase64, file.name);
-                    setTimeout(() => { window.open(`https://web.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank'); }, 1500); 
+                    setTimeout(() => { window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank'); }, 1500); 
                 }
             } catch (err) { 
                 console.error(err);
