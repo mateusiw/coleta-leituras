@@ -281,7 +281,7 @@
             <h3 class="text-xl font-black text-slate-800 text-center">Confirmar Envio?</h3>
             <p class="text-sm text-slate-500 mt-3 text-center leading-relaxed font-medium">
                 Verifique se o valor medido e as fotos anexadas estão corretos.<br><br>
-                <span class="text-brand-600 font-bold">O boletim será direcionado para o WhatsApp.</span>
+                <span class="text-brand-600 font-bold">O boletim será preparado para o WhatsApp.</span>
             </p>
             <div class="grid grid-cols-2 gap-3 mt-6">
                 <button onclick="hideConfirmModal()" class="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-sm transition-colors uppercase">
@@ -337,7 +337,7 @@
         </div>
     </div>
 
-    <!-- MODAL DE PRONTO PARA COMPARTILHAR (FALLBACK) -->
+    <!-- MODAL DE PRONTO PARA COMPARTILHAR (AGORA PADRÃO) -->
     <div id="shareReadyModal" class="fixed inset-0 bg-black/60 z-[90] hidden flex justify-center items-center backdrop-blur-sm transition-opacity duration-300">
         <div class="bg-white rounded-2xl shadow-2xl p-6 w-11/12 max-w-sm transform transition-all scale-100 text-center">
             <div class="mx-auto flex items-center justify-center h-14 w-14 rounded-full bg-green-50 mb-4">
@@ -759,7 +759,7 @@
             if (!pendingShareData) return;
             const { base64, filename, text, filesArray } = pendingShareData;
             
-            // Tentativa nativa com o "clique novo" do usuário
+            // Tentativa nativa com o "clique novo" do usuário (Garantia de que o navegador vai aceitar)
             if (filesArray && navigator.share && navigator.canShare && navigator.canShare({ files: filesArray })) {
                 try {
                     await navigator.share({ files: filesArray, title: filename, text: text });
@@ -767,11 +767,11 @@
                     return; // Sucesso, finaliza a execução
                 } catch (err) {
                     console.log("Falha no share nativo pelo botão pronto:", err);
-                    if (err.name === 'AbortError') return; // Usuário apenas fechou o popup, não faz nada
+                    if (err.name === 'AbortError') return; // Usuário apenas fechou o popup de share, não faz nada
                 }
             }
             
-            // Fallback direto e garantido para quando a função do sistema não suporta imagens
+            // Fallback direto e garantido para quando a função do sistema não suporta imagens (ex: WhatsApp Web / PCs)
             downloadFile(base64, filename + '.jpg');
             window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
             hideShareReadyModal();
@@ -1053,25 +1053,12 @@
                 const file = new File([imgBlob], `${filenameBase}.jpg`, { type: 'image/jpeg' });
                 const filesArray = [file];
 
-                // Limpa a tela antes de abrir o popup ou o modal final
+                // Limpa a tela "Processando" e restaura o botão original
                 hideLoadingModal();
                 if(btnSpan) btnSpan.innerText = originalText;
 
-                // TENTA COMPARTILHAR IMEDIATAMENTE
-                if (navigator.share && navigator.canShare && navigator.canShare({ files: filesArray })) { 
-                    try {
-                        await navigator.share({ files: filesArray, title: filenameBase, text: shareText }); 
-                    } catch (shareErr) {
-                        console.log("Compartilhamento nativo não completou:", shareErr);
-                        // SE O NAVEGADOR BLOQUEAR (TIMEOUT/PERMISSÃO), MOSTRA O MODAL "TUDO PRONTO"
-                        if (shareErr.name !== 'AbortError') {
-                            showShareReadyModal(finalImageBase64, filenameBase, shareText, filesArray);
-                        }
-                    }
-                } else { 
-                    // SE O DISPOSITIVO NÃO SUPORTA SHARE DE ARQUIVOS, MOSTRA O MODAL "TUDO PRONTO"
-                    showShareReadyModal(finalImageBase64, filenameBase, shareText, filesArray);
-                }
+                // --- SEMPRE MOSTRA O MODAL "TUDO PRONTO" POR PADRÃO ---
+                showShareReadyModal(finalImageBase64, filenameBase, shareText, filesArray);
 
             } catch (err) { 
                 console.error(err);
