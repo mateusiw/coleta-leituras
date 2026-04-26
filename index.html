@@ -852,6 +852,8 @@
                 
                 const dateObj = new Date(dateVal + "T00:00:00");
                 const displayDate = dateObj.toLocaleDateString('pt-BR');
+                const monthNameRaw = dateObj.toLocaleString('pt-BR', { month: 'long' });
+                const displayMonth = monthNameRaw.charAt(0).toUpperCase() + monthNameRaw.slice(1);
                 const now = new Date();
                 const timeString = now.toLocaleTimeString('pt-BR');
                 
@@ -876,6 +878,10 @@
 
                         if (result && result.consumo !== undefined) {
                             consumoText += `*Consumo (24h):* ${result.consumo} kWh\n`;
+                            
+                            if (result.acumuladoMes !== undefined) {
+                                consumoText += `*Total Acumulado (${displayMonth}):* ${result.acumuladoMes} kWh\n`;
+                            }
                             
                             if (result.percentual !== undefined && result.ultimos.length > 0) {
                                 const perc = result.percentual;
@@ -909,12 +915,28 @@
                     }
 
                 } else {
-                    btnSpan.innerText = "Consultando Clima...";
-                    showLoadingModal("Consultando Clima...", "Buscando previsão para as próximas horas.");
-                    
                     const mm = document.getElementById('rainAmount').value;
                     const classification = getRainClassification(mm).text;
                     filenameBase = `Pluviometro - ${location} - ${displayDate.replace(/\//g, '-')}`;
+
+                    btnSpan.innerText = "Calculando Acumulado...";
+                    showLoadingModal("Calculando Chuva...", "Consultando o total acumulado do mês.");
+
+                    let acumuladoText = "";
+                    try {
+                        const SCRIPT_URL_CHUVA = "https://script.google.com/macros/s/AKfycbxthYEVkpX5aGi-a6pZL17CquWjgnVGQ10d5Ob_YmrblgBFsv3GFrApPLunRn_D72tMXQ/exec";
+                        const response = await fetch(`${SCRIPT_URL_CHUVA}?action=calcRain&date=${encodeURIComponent(displayDate)}&mm=${mm}`);
+                        const result = await response.json();
+
+                        if (result && result.acumuladoMes !== undefined) {
+                            acumuladoText = `*Total Acumulado (${displayMonth}):* ${result.acumuladoMes} mm\n`;
+                        }
+                    } catch (e) {
+                        console.error("Erro ao puxar acumulado de chuva:", e);
+                    }
+
+                    btnSpan.innerText = "Consultando Clima...";
+                    showLoadingModal("Consultando Clima...", "Buscando previsão para as próximas horas.");
 
                     shareText = `🌧️ *BOLETIM PLUVIOMÉTRICO SPG* 🌧️\n\n`;
                     shareText += `*Data da Leitura:* ${displayDate} às ${timeString}\n`;
@@ -922,6 +944,11 @@
                     shareText += `*Responsável:* ${user}\n\n`;
                     shareText += `📊 *RESULTADO DA MEDIÇÃO*\n`;
                     shareText += `*Volume Medido:* ${mm} mm\n`;
+                    
+                    if (acumuladoText !== "") {
+                        shareText += acumuladoText;
+                    }
+                    
                     shareText += `*Classificação:* ${classification}\n`;
                     
                     if (notes.trim() !== '') {
@@ -941,7 +968,8 @@
                         user: user,
                         volume_mm: mm,
                         classification: classification,
-                        notes: notes
+                        notes: notes,
+                        tipoRegistro: "Pluviômetro"
                     };
                 }
 
