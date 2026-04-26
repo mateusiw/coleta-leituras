@@ -785,11 +785,10 @@
             try {
                 const lat = -4.1725085524108625;
                 const lon = -40.87679951982965;
-                // Alterada a URL para buscar também a temperatura das próximas horas (hourly=temperature_2m)
                 const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,precipitation&hourly=temperature_2m,precipitation_probability,precipitation&timezone=America%2FFortaleza&forecast_hours=4`;
                 
-                const response = await fetch(url);
-                const data = await response.json();
+                const fetchForecastRes = await fetch(url);
+                const data = await fetchForecastRes.json();
                 
                 const curr = data.current;
                 const temp = Math.round(curr.temperature_2m);
@@ -815,7 +814,7 @@
                     const hour = String(time.getHours()).padStart(2, '0') + 'h00';
                     const prob = data.hourly.precipitation_probability[i];
                     const mm = data.hourly.precipitation[i];
-                    const tempHour = Math.round(data.hourly.temperature_2m[i]); // Adicionado: pega a temperatura da hora
+                    const tempHour = Math.round(data.hourly.temperature_2m[i]); 
                     
                     let icon = '☁️'; 
                     if (mm === 0 && prob < 20) icon = '☀️'; 
@@ -824,7 +823,6 @@
                     else if (mm > 2.5 && mm <= 10) icon = '🌧️'; 
                     else if (mm > 10) icon = '⛈️'; 
                     
-                    // Adicionado a temperatura ao lado da hora conforme o pedido do usuário
                     forecastText += `> ${icon} *${tempHour}°C ${hour}* - Prob: ${prob}% (${mm}mm)\n`;
                 }
                 return forecastText;
@@ -871,20 +869,19 @@
 
                     let consumoText = "";
                     try {
-                        // URL Exclusiva para a Planilha de Energia
                         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwdcKr5TjUo2n81BJXFwX9lB8LS3Vfe2jBGoEr2jyWf5MvSBgi8SHtaFvNHe6q8pgY3pA/exec";
-                        const response = await fetch(`${SCRIPT_URL}?action=calcEnergy&reading=${kwh}`);
-                        const result = await response.json();
+                        const energyRes = await fetch(`${SCRIPT_URL}?action=calcEnergy&reading=${kwh}`);
+                        const energyData = await energyRes.json();
 
-                        if (result && result.consumo !== undefined) {
-                            consumoText += `*Consumo (24h):* ${result.consumo} kWh\n`;
+                        if (energyData && energyData.consumo !== undefined) {
+                            consumoText += `*Consumo (24h):* ${energyData.consumo} kWh\n`;
                             
-                            if (result.acumuladoMes !== undefined) {
-                                consumoText += `*Total Acumulado (${displayMonth}):* ${result.acumuladoMes} kWh\n`;
+                            if (energyData.acumuladoMes !== undefined) {
+                                consumoText += `*Total Acumulado (${displayMonth}):* ${energyData.acumuladoMes} kWh\n`;
                             }
                             
-                            if (result.percentual !== undefined && result.ultimos.length > 0) {
-                                const perc = result.percentual;
+                            if (energyData.percentual !== undefined && energyData.ultimos.length > 0) {
+                                const perc = energyData.percentual;
                                 if (perc > 0) {
                                     consumoText += `📈 *Aumento de ${perc.toFixed(1)}%* em relação a ontem.\n`;
                                 } else if (perc < 0) {
@@ -892,7 +889,7 @@
                                 } else {
                                     consumoText += `⚖️ *Consumo manteve-se igual* a ontem.\n`;
                                 }
-                                consumoText += `\n*Últimos 5 consumos:*\n${result.ultimos.join('\n')}\n`;
+                                consumoText += `\n*Últimos 5 consumos:*\n${energyData.ultimos.join('\n')}\n`;
                             }
                         }
                     } catch (e) {
@@ -928,14 +925,12 @@
                     try {
                         const SCRIPT_URL_CHUVA = "https://script.google.com/macros/s/AKfycbxthYEVkpX5aGi-a6pZL17CquWjgnVGQ10d5Ob_YmrblgBFsv3GFrApPLunRn_D72tMXQ/exec";
                         
-                        // DISPARA AS DUAS CONSULTAS SIMULTANEAMENTE PARA NÃO DAR TIMEOUT
                         const promiseAcumulado = fetch(`${SCRIPT_URL_CHUVA}?action=calcRain&date=${encodeURIComponent(displayDate)}&mm=${mm}`)
                             .then(res => res.json())
                             .catch(e => { console.error("Erro chuva:", e); return null; });
                             
                         const promiseClima = getWeatherForecast();
 
-                        // O código aguarda as duas finalizarem ao mesmo tempo, reduzindo pela metade o tempo de espera
                         const [resultAcumulado, resultClima] = await Promise.all([promiseAcumulado, promiseClima]);
 
                         if (resultAcumulado && resultAcumulado.acumuladoMes !== undefined) {
@@ -982,12 +977,10 @@
                     };
                 }
 
-                // --- ENVIO PARA O GOOGLE SHEETS (Apenas Pluviômetro) ---
                 if (!isEnergy) {
-                    sendDataToGoogleSheets(payload); // Não usa "await" propositalmente para não travar a tela
+                    sendDataToGoogleSheets(payload); 
                 }
 
-                // Tratamento de Imagens
                 let finalImageBase64 = currentPhotosBase64[0];
                 if (currentPhotosBase64.length > 1) {
                     btnSpan.innerText = "Mesclando Imagens...";
@@ -998,25 +991,23 @@
                     finalImageBase64 = await mergeImagesVertically(currentPhotosBase64);
                 }
 
-                // Cria o arquivo
-                const response = await fetch(finalImageBase64);
-                const blob = await response.blob();
-                const file = new File([blob], `${filenameBase}.jpg`, { type: 'image/jpeg' });
-                const filesArray = [file];
+                const imgResponse = await fetch(finalImageBase64);
+                const imgBlob = await imgResponse.blob();
+                const imageFile = new File([imgBlob], `${filenameBase}.jpg`, { type: 'image/jpeg' });
+                const filesArray = [imageFile];
 
                 if (navigator.share && navigator.canShare && navigator.canShare({ files: filesArray })) { 
                     try {
                         await navigator.share({ files: filesArray, title: filenameBase, text: shareText }); 
                     } catch (shareErr) {
                         console.log("Compartilhamento cancelado ou falhou:", shareErr);
-                        // FALLBACK: Se o navegador der Timeout e bloquear o Popup, força abrir o Whatsapp Direto!
                         if (shareErr.name !== 'AbortError') { 
-                            downloadFile(finalImageBase64, file.name);
+                            downloadFile(finalImageBase64, imageFile.name);
                             setTimeout(() => { window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank'); }, 500); 
                         }
                     }
                 } else { 
-                    downloadFile(finalImageBase64, file.name);
+                    downloadFile(finalImageBase64, imageFile.name);
                     setTimeout(() => { window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank'); }, 1500); 
                 }
             } catch (err) { 
@@ -1030,7 +1021,6 @@
         }
 
         async function sendDataToGoogleSheets(payload) {
-            // URL configurada do Apps Script
             const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxthYEVkpX5aGi-a6pZL17CquWjgnVGQ10d5Ob_YmrblgBFsv3GFrApPLunRn_D72tMXQ/exec"; 
             
             if (!SCRIPT_URL || SCRIPT_URL === "SUA_URL_DO_APPS_SCRIPT_AQUI") {
