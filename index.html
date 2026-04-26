@@ -922,6 +922,7 @@
                     showLoadingModal("Calculando Consumo...", "Consultando a planilha de energia.");
                     
                     const kwh = document.getElementById('energyAmount').value;
+                    const kwhFormatted = Number(kwh).toLocaleString('pt-BR'); // Valor formatado com pontos
                     filenameBase = `Energia - ${location} - ${displayDate.replace(/\//g, '-')}`;
 
                     let consumoText = "";
@@ -931,10 +932,12 @@
                         const energyData = await energyRes.json();
 
                         if (energyData && energyData.consumo !== undefined) {
-                            consumoText += `*Consumo (24h):* ${energyData.consumo} kWh\n`;
+                            const consumoFmt = Number(energyData.consumo).toLocaleString('pt-BR');
+                            consumoText += `*Consumo (24h):* ${consumoFmt} kWh\n`;
                             
                             if (energyData.acumuladoMes !== undefined) {
-                                consumoText += `*Total Acumulado (${displayMonth}):* ${energyData.acumuladoMes} kWh\n`;
+                                const acumuladoFmt = Number(energyData.acumuladoMes).toLocaleString('pt-BR');
+                                consumoText += `*Total Acumulado (${displayMonth}):* ${acumuladoFmt} kWh\n`;
                             }
                             
                             if (energyData.percentual !== undefined && energyData.ultimos.length > 0) {
@@ -958,7 +961,7 @@
                     shareText += `*Local:* ${location}\n`;
                     shareText += `*Responsável:* ${user}\n\n`;
                     shareText += `📋 *DADOS DA LEITURA*\n`;
-                    shareText += `*Leitura Registrada:* ${kwh}\n`;
+                    shareText += `*Leitura Registrada:* ${kwhFormatted}\n`;
                     
                     if (consumoText !== "") {
                         shareText += `\n${consumoText}`;
