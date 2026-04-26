@@ -993,21 +993,18 @@
 
                 const imgResponse = await fetch(finalImageBase64);
                 const imgBlob = await imgResponse.blob();
-                const imageFile = new File([imgBlob], `${filenameBase}.jpg`, { type: 'image/jpeg' });
-                const filesArray = [imageFile];
+                const file = new File([imgBlob], `${filenameBase}.jpg`, { type: 'image/jpeg' });
+                const filesArray = [file];
 
+                // ROTINA DE COMPARTILHAMENTO CORRIGIDA PARA O ESTADO ORIGINAL
                 if (navigator.share && navigator.canShare && navigator.canShare({ files: filesArray })) { 
                     try {
                         await navigator.share({ files: filesArray, title: filenameBase, text: shareText }); 
                     } catch (shareErr) {
                         console.log("Compartilhamento cancelado ou falhou:", shareErr);
-                        if (shareErr.name !== 'AbortError') { 
-                            downloadFile(finalImageBase64, imageFile.name);
-                            setTimeout(() => { window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank'); }, 500); 
-                        }
                     }
                 } else { 
-                    downloadFile(finalImageBase64, imageFile.name);
+                    downloadFile(finalImageBase64, file.name);
                     setTimeout(() => { window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank'); }, 1500); 
                 }
             } catch (err) { 
