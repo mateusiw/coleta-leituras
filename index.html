@@ -943,11 +943,11 @@
                             if (energyData.percentual !== undefined && energyData.ultimos.length > 0) {
                                 const perc = energyData.percentual;
                                 if (perc > 0) {
-                                    consumoText += `📈 *Aumento de ${perc.toFixed(1)}%* em relação a ontem.\n`;
+                                    consumoText += `📈 *O consumo subiu ${perc.toFixed(1)}%* em relação à leitura anterior.\n`;
                                 } else if (perc < 0) {
-                                    consumoText += `📉 *Queda de ${Math.abs(perc).toFixed(1)}%* em relação a ontem.\n`;
+                                    consumoText += `📉 *O consumo caiu ${Math.abs(perc).toFixed(1)}%* em relação à leitura anterior.\n`;
                                 } else {
-                                    consumoText += `⚖️ *Consumo manteve-se igual* a ontem.\n`;
+                                    consumoText += `⚖️ *O consumo manteve-se igual* à leitura anterior.\n`;
                                 }
                                 consumoText += `\n*Últimos 5 consumos:*\n${energyData.ultimos.join('\n')}\n`;
                             }
