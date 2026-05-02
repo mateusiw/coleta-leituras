@@ -907,8 +907,17 @@
                 
                 const dateObj = new Date(dateVal + "T00:00:00");
                 const displayDate = dateObj.toLocaleDateString('pt-BR');
-                const monthNameRaw = dateObj.toLocaleString('pt-BR', { month: 'long' });
-                const displayMonth = monthNameRaw.charAt(0).toUpperCase() + monthNameRaw.slice(1);
+                
+                // Mês para a Chuva (Mês da data selecionada)
+                const monthNameRawRain = dateObj.toLocaleString('pt-BR', { month: 'long' });
+                const displayMonthRain = monthNameRawRain.charAt(0).toUpperCase() + monthNameRawRain.slice(1);
+                
+                // Mês para a Energia (Mês do dia anterior)
+                const energyRefDate = new Date(dateObj);
+                energyRefDate.setDate(energyRefDate.getDate() - 1);
+                const monthNameRawEnergy = energyRefDate.toLocaleString('pt-BR', { month: 'long' });
+                const displayMonthEnergy = monthNameRawEnergy.charAt(0).toUpperCase() + monthNameRawEnergy.slice(1);
+
                 const now = new Date();
                 const timeString = now.toLocaleTimeString('pt-BR');
                 
@@ -937,7 +946,7 @@
                             
                             if (energyData.acumuladoMes !== undefined) {
                                 const acumuladoFmt = Number(energyData.acumuladoMes).toLocaleString('pt-BR');
-                                consumoText += `*Total Acumulado (${displayMonth}):* ${acumuladoFmt} kWh\n`;
+                                consumoText += `*Total Acumulado (${displayMonthEnergy}):* ${acumuladoFmt} kWh\n`;
                             }
                             
                             if (energyData.percentual !== undefined && energyData.ultimos.length > 0) {
@@ -994,7 +1003,7 @@
                         const [resultAcumulado, resultClima] = await Promise.all([promiseAcumulado, promiseClima]);
 
                         if (resultAcumulado && resultAcumulado.acumuladoMes !== undefined) {
-                            acumuladoText = `*Total Acumulado (${displayMonth}):* ${resultAcumulado.acumuladoMes} mm\n`;
+                            acumuladoText = `*Total Acumulado (${displayMonthRain}):* ${resultAcumulado.acumuladoMes} mm\n`;
                         }
                         
                         if (resultClima) {
