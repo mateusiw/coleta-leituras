@@ -363,6 +363,8 @@
         let photosEnergy = [];
         let currentPhotosBase64 = photosRain;
         let currentMode = 'pluviometro'; // Modos: 'pluviometro' ou 'energia'
+        const SCRIPT_URL_ENERGIA = "https://script.google.com/macros/s/AKfycbwdcKr5TjUo2n81BJXFwX9lB8LS3Vfe2jBGoEr2jyWf5MvSBgi8SHtaFvNHe6q8pgY3pA/exec";
+        const SCRIPT_URL_CHUVA = "https://script.google.com/macros/s/AKfycbxthYEVkpX5aGi-a6pZL17CquWjgnVGQ10d5Ob_YmrblgBFsv3GFrApPLunRn_D72tMXQ/exec"; 
 
         // Inicialização
         document.addEventListener("DOMContentLoaded", () => {
@@ -378,6 +380,34 @@
             }
             updatePreview();
         });
+
+        // DESPERTADOR EM SEGUNDO PLANO (PING)
+        // Isso aquece os servidores do Google App Script pra evitar lentidão se a pessoa deixou o celular parado
+        function wakeUpAppsScript() {
+            fetch(`${SCRIPT_URL_ENERGIA}?action=ping`, { mode: 'no-cors' }).catch(() => {});
+            fetch(`${SCRIPT_URL_CHUVA}?action=ping`, { mode: 'no-cors' }).catch(() => {});
+        }
+
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === 'visible') {
+                wakeUpAppsScript();
+            }
+        });
+
+        // SISTEMA ANTI-FALHAS PARA CONSULTAS DE INTERNET
+        async function fetchWithRetry(url, options = {}, retries = 3) {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return await response.json();
+                } catch (e) {
+                    console.warn(`Tentativa de consulta ${i + 1} falhou. Retentando...`, e);
+                    if (i === retries - 1) throw e;
+                    await new Promise(res => setTimeout(res, 1000)); // Espera 1 segundo e tenta de novo
+                }
+            }
+        }
 
         // Alternador de Modos (Pluviômetro vs Energia)
         function setMode(mode) {
@@ -844,8 +874,8 @@
                 const lon = -40.87679951982965;
                 const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,precipitation&hourly=temperature_2m,precipitation_probability,precipitation&timezone=America%2FFortaleza&forecast_hours=4`;
                 
-                const fetchForecastRes = await fetch(url);
-                const data = await fetchForecastRes.json();
+                // USANDO A NOVA FUNÇÃO ANTI-FALHAS
+                const data = await fetchWithRetry(url);
                 
                 const curr = data.current;
                 const temp = Math.round(curr.temperature_2m);
@@ -936,9 +966,8 @@
 
                     let consumoText = "";
                     try {
-                        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwdcKr5TjUo2n81BJXFwX9lB8LS3Vfe2jBGoEr2jyWf5MvSBgi8SHtaFvNHe6q8pgY3pA/exec";
-                        const energyRes = await fetch(`${SCRIPT_URL}?action=calcEnergy&reading=${kwh}`);
-                        const energyData = await energyRes.json();
+                        // USANDO A NOVA FUNÇÃO ANTI-FALHAS
+                        const energyData = await fetchWithRetry(`${SCRIPT_URL_ENERGIA}?action=calcEnergy&reading=${kwh}`);
 
                         if (energyData && energyData.consumo !== undefined) {
                             const consumoFmt = Number(energyData.consumo).toLocaleString('pt-BR');
@@ -992,10 +1021,8 @@
                     let weatherForecastText = "";
                     
                     try {
-                        const SCRIPT_URL_CHUVA = "https://script.google.com/macros/s/AKfycbxthYEVkpX5aGi-a6pZL17CquWjgnVGQ10d5Ob_YmrblgBFsv3GFrApPLunRn_D72tMXQ/exec";
-                        
-                        const promiseAcumulado = fetch(`${SCRIPT_URL_CHUVA}?action=calcRain&date=${encodeURIComponent(displayDate)}&mm=${mm}`)
-                            .then(res => res.json())
+                        // USANDO A NOVA FUNÇÃO ANTI-FALHAS
+                        const promiseAcumulado = fetchWithRetry(`${SCRIPT_URL_CHUVA}?action=calcRain&date=${encodeURIComponent(displayDate)}&mm=${mm}`)
                             .catch(e => { console.error("Erro chuva:", e); return null; });
                             
                         const promiseClima = getWeatherForecast();
@@ -1090,16 +1117,22 @@
                 return;
             }
             
-            try { 
-                await fetch(SCRIPT_URL, { 
-                    method: 'POST', 
-                    mode: 'no-cors', 
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
-                    body: JSON.stringify(payload) 
-                }); 
-                console.log("Dados enviados para a planilha com sucesso!");
-            } catch (err) {
-                console.error("Erro ao enviar para a planilha:", err);
+            let retries = 3;
+            for (let i = 0; i < retries; i++) {
+                try { 
+                    await fetch(SCRIPT_URL, { 
+                        method: 'POST', 
+                        mode: 'no-cors', 
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
+                        body: JSON.stringify(payload) 
+                    }); 
+                    console.log("Dados enviados para a planilha com sucesso!");
+                    return; // Sucesso, finaliza a execução
+                } catch (err) {
+                    console.warn(`Tentativa de envio ${i + 1} falhou. Retentando...`, err);
+                    if (i === retries - 1) console.error("Erro ao enviar para a planilha:", err);
+                    await new Promise(res => setTimeout(res, 1000));
+                }
             }
         }
 
