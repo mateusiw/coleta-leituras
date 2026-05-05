@@ -272,6 +272,16 @@
         </div>
     </div>
 
+    <!-- MODAL DE SINCRONIZAÇÃO EM SEGUNDO PLANO -->
+    <div id="syncModal" class="fixed inset-0 bg-slate-900/40 z-[100] hidden flex justify-center items-center backdrop-blur-sm transition-opacity duration-300">
+        <div class="bg-white rounded-[24px] shadow-2xl p-8 w-11/12 max-w-[320px] transform transition-all scale-100 flex flex-col items-center justify-center text-center">
+            <div class="animate-spin mb-4">
+                <i data-lucide="loader-2" class="h-10 w-10 text-slate-800"></i>
+            </div>
+            <h3 class="text-[17px] font-bold text-slate-800 tracking-tight">Sincronizando Dados</h3>
+        </div>
+    </div>
+
     <!-- MODAL DE CONFIRMAÇÃO DE ENVIO -->
     <div id="confirmModal" class="fixed inset-0 bg-black/60 z-[60] hidden flex justify-center items-center backdrop-blur-sm transition-opacity duration-300">
         <div class="bg-white rounded-2xl shadow-2xl p-6 w-11/12 max-w-md transform transition-all scale-100">
@@ -362,9 +372,14 @@
         let photosRain = [];
         let photosEnergy = [];
         let currentPhotosBase64 = photosRain;
-        let currentMode = 'pluviometro'; // Modos: 'pluviometro' ou 'energia'
+        let currentMode = 'pluviometro'; 
         const SCRIPT_URL_ENERGIA = "https://script.google.com/macros/s/AKfycbwdcKr5TjUo2n81BJXFwX9lB8LS3Vfe2jBGoEr2jyWf5MvSBgi8SHtaFvNHe6q8pgY3pA/exec";
         const SCRIPT_URL_CHUVA = "https://script.google.com/macros/s/AKfycbxthYEVkpX5aGi-a6pZL17CquWjgnVGQ10d5Ob_YmrblgBFsv3GFrApPLunRn_D72tMXQ/exec"; 
+
+        // VARIÁVEIS DO SISTEMA DE SINCRONIZAÇÃO
+        let lastInteractionTime = Date.now();
+        let isSyncing = false;
+        let cachedWeatherText = "";
 
         // Inicialização
         document.addEventListener("DOMContentLoaded", () => {
@@ -379,19 +394,47 @@
                 dateInput.value = `${yyyy}-${mm}-${dd}`;
             }
             updatePreview();
+            syncData(); // Sincroniza logo ao abrir o aplicativo
         });
 
-        // DESPERTADOR EM SEGUNDO PLANO (PING)
-        // Isso aquece os servidores do Google App Script pra evitar lentidão se a pessoa deixou o celular parado
-        function wakeUpAppsScript() {
-            fetch(`${SCRIPT_URL_ENERGIA}?action=ping`, { mode: 'no-cors' }).catch(() => {});
-            fetch(`${SCRIPT_URL_CHUVA}?action=ping`, { mode: 'no-cors' }).catch(() => {});
+        // ROTINA MESTRE DE SINCRONIZAÇÃO EM SEGUNDO PLANO
+        async function syncData() {
+            if (isSyncing) return;
+            isSyncing = true;
+            
+            document.getElementById('syncModal').classList.remove('hidden');
+            lucide.createIcons();
+
+            try {
+                // Prepara a consulta da API de Clima
+                const pWeather = fetchWeatherForecastData();
+                
+                // Acorda os servidores do Google (O erro Status 0 não vai mais acontecer graças ao ajuste no fetchWithRetry)
+                const pPingEnergia = fetchWithRetry(`${SCRIPT_URL_ENERGIA}?action=ping`, { mode: 'no-cors' }, 1).catch(() => {});
+                const pPingChuva = fetchWithRetry(`${SCRIPT_URL_CHUVA}?action=ping`, { mode: 'no-cors' }, 1).catch(() => {});
+
+                // Dispara e espera os 3 terminarem em paralelo para economizar tempo
+                cachedWeatherText = await pWeather;
+                await Promise.all([pPingEnergia, pPingChuva]);
+
+            } catch (e) {
+                console.error("Erro na sincronização:", e);
+            } finally {
+                document.getElementById('syncModal').classList.add('hidden');
+                isSyncing = false;
+            }
         }
 
-        document.addEventListener("visibilitychange", () => {
-            if (document.visibilityState === 'visible') {
-                wakeUpAppsScript();
-            }
+        // RASTREADOR DE INATIVIDADE DE 30 SEGUNDOS
+        ['touchstart', 'mousemove', 'keydown', 'scroll', 'click'].forEach(evt => {
+            document.addEventListener(evt, () => {
+                const now = Date.now();
+                // Se a pessoa passou mais de 30 segundos sem interagir com o celular e tocou novamente...
+                if (now - lastInteractionTime > 30000) { 
+                    syncData(); // ...Ele sincroniza na hora!
+                }
+                lastInteractionTime = now;
+            }, { passive: true });
         });
 
         // SISTEMA ANTI-FALHAS PARA CONSULTAS DE INTERNET
@@ -399,6 +442,11 @@
             for (let i = 0; i < retries; i++) {
                 try {
                     const response = await fetch(url, options);
+                    
+                    // CORREÇÃO: Se a chamada for "no-cors", não tentamos ler o JSON.
+                    // Isso elimina o "Error HTTP status 0" que você reportou.
+                    if (options.mode === 'no-cors') return response; 
+                    
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     return await response.json();
                 } catch (e) {
@@ -868,14 +916,14 @@
             return '';
         }
 
-        async function getWeatherForecast() {
+        async function fetchWeatherForecastData() {
             try {
                 const lat = -4.1725085524108625;
                 const lon = -40.87679951982965;
                 const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,precipitation&hourly=temperature_2m,precipitation_probability,precipitation&timezone=America%2FFortaleza&forecast_hours=4`;
                 
-                // USANDO A NOVA FUNÇÃO ANTI-FALHAS
                 const data = await fetchWithRetry(url);
+                if (!data || !data.current) return "";
                 
                 const curr = data.current;
                 const temp = Math.round(curr.temperature_2m);
@@ -966,7 +1014,6 @@
 
                     let consumoText = "";
                     try {
-                        // USANDO A NOVA FUNÇÃO ANTI-FALHAS
                         const energyData = await fetchWithRetry(`${SCRIPT_URL_ENERGIA}?action=calcEnergy&reading=${kwh}`);
 
                         if (energyData && energyData.consumo !== undefined) {
@@ -1021,11 +1068,11 @@
                     let weatherForecastText = "";
                     
                     try {
-                        // USANDO A NOVA FUNÇÃO ANTI-FALHAS
                         const promiseAcumulado = fetchWithRetry(`${SCRIPT_URL_CHUVA}?action=calcRain&date=${encodeURIComponent(displayDate)}&mm=${mm}`)
                             .catch(e => { console.error("Erro chuva:", e); return null; });
                             
-                        const promiseClima = getWeatherForecast();
+                        // Se o clima já foi baixado no fundo, usa ele. Se não, baixa de novo.
+                        const promiseClima = cachedWeatherText ? Promise.resolve(cachedWeatherText) : fetchWeatherForecastData();
 
                         const [resultAcumulado, resultClima] = await Promise.all([promiseAcumulado, promiseClima]);
 
@@ -1074,7 +1121,7 @@
                 }
 
                 if (!isEnergy) {
-                    sendDataToGoogleSheets(payload); 
+                    sendDataToGoogleSheets(payload); // Não vai mais dar o erro de status 0!
                 }
 
                 let finalImageBase64 = currentPhotosBase64[0];
@@ -1110,9 +1157,7 @@
         }
 
         async function sendDataToGoogleSheets(payload) {
-            const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxthYEVkpX5aGi-a6pZL17CquWjgnVGQ10d5Ob_YmrblgBFsv3GFrApPLunRn_D72tMXQ/exec"; 
-            
-            if (!SCRIPT_URL || SCRIPT_URL === "SUA_URL_DO_APPS_SCRIPT_AQUI") {
+            if (!SCRIPT_URL_CHUVA || SCRIPT_URL_CHUVA === "SUA_URL_DO_APPS_SCRIPT_AQUI") {
                 console.log("URL do Apps Script não configurada.");
                 return;
             }
@@ -1120,14 +1165,14 @@
             let retries = 3;
             for (let i = 0; i < retries; i++) {
                 try { 
-                    await fetch(SCRIPT_URL, { 
+                    await fetchWithRetry(SCRIPT_URL_CHUVA, { 
                         method: 'POST', 
                         mode: 'no-cors', 
                         headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
                         body: JSON.stringify(payload) 
                     }); 
                     console.log("Dados enviados para a planilha com sucesso!");
-                    return; // Sucesso, finaliza a execução
+                    return; // Sucesso, finaliza
                 } catch (err) {
                     console.warn(`Tentativa de envio ${i + 1} falhou. Retentando...`, err);
                     if (i === retries - 1) console.error("Erro ao enviar para a planilha:", err);
