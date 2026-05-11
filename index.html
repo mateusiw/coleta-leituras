@@ -122,6 +122,9 @@
                                 <option value="Mateus Paulo">Mateus Paulo</option>
                                 <option value="Rodrigo Lima Leitão">Rodrigo Lima Leitão</option>
                                 <option value="Michel Rodrigues de Souza">Michel Rodrigues de Souza</option>
+                                <option value="Alexandro Ribeiro">Alexandro Ribeiro</option>
+                                <option value="Rafael Saraiva">Rafael Saraiva</option>
+                                <option value="Airton Cordeiro">Airton Cordeiro</option>
                                 <option value="Outro">Outro (Digitar manualmente)</option>
                             </select>
                             
@@ -136,6 +139,7 @@
                         <select id="locationSelect" required onchange="handleLocationChange()" class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none text-sm bg-white font-bold">
                             <option value="">Selecione o local...</option>
                             <option value="SPG Sede">SPG Sede</option>
+                            <option value="SPG Oásis">SPG Oásis</option>
                             <option value="Outro">Outro (Digitar manualmente)</option>
                         </select>
                         
@@ -374,7 +378,7 @@
         let currentPhotosBase64 = photosRain;
         let currentMode = 'pluviometro'; 
         const SCRIPT_URL_ENERGIA = "https://script.google.com/macros/s/AKfycbwdcKr5TjUo2n81BJXFwX9lB8LS3Vfe2jBGoEr2jyWf5MvSBgi8SHtaFvNHe6q8pgY3pA/exec";
-        const SCRIPT_URL_CHUVA = "https://script.google.com/macros/s/AKfycbxthYEVkpX5aGi-a6pZL17CquWjgnVGQ10d5Ob_YmrblgBFsv3GFrApPLunRn_D72tMXQ/exec"; 
+        const SCRIPT_URL_CHUVA = "https://script.google.com/macros/s/AKfycbxsUyjRMtumxhu5KYKMM3tIbPHX8eaM7elcO6JAQ70Pes9rkDxJVCoHqxZC6CzuHAbqhQ/exec"; 
 
         // VARIÁVEIS DO SISTEMA DE SINCRONIZAÇÃO
         let lastInteractionTime = Date.now();
@@ -448,7 +452,14 @@
                     if (options.mode === 'no-cors') return response; 
                     
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                    return await response.json();
+                    
+                    const text = await response.text();
+                    try {
+                        return JSON.parse(text);
+                    } catch (parseError) {
+                        console.warn("A API retornou texto em vez de JSON. Retorno bruto:", text.substring(0, 150));
+                        return { rawText: text }; // Retorna um objeto vazio seguro em vez de lançar um erro e forçar retentativas
+                    }
                 } catch (e) {
                     console.warn(`Tentativa de consulta ${i + 1} falhou. Retentando...`, e);
                     if (i === retries - 1) throw e;
@@ -469,6 +480,12 @@
             const rainInput = document.getElementById('rainAmount');
             const energyInput = document.getElementById('energyAmount');
             const previewHeader = document.getElementById('previewHeader');
+            const locSelect = document.getElementById('locationSelect');
+
+            // Salva o valor atual para tentar manter se a pessoa só trocar de aba
+            const currentLoc = locSelect.value;
+            
+            locSelect.innerHTML = '<option value="">Selecione o local...</option>';
 
             if (isEnergy) {
                 btnEnergy.className = "flex-1 py-2.5 px-4 text-sm font-black rounded-lg bg-white shadow-sm text-yellow-600 transition-all border border-slate-200/50";
@@ -491,6 +508,12 @@
                 previewHeader.classList.remove('from-brand-700', 'via-brand-600', 'to-brand-800', 'border-brand-900');
                 previewHeader.classList.add('from-yellow-500', 'via-amber-500', 'to-orange-600', 'border-orange-700');
 
+                // Adiciona opções de local específicas para ENERGIA
+                locSelect.innerHTML += '<option value="SPG Oásis R1">SPG Oásis R1</option>';
+                locSelect.innerHTML += '<option value="SPG Oásis R2">SPG Oásis R2</option>';
+                locSelect.innerHTML += '<option value="SPG Oásis R3">SPG Oásis R3</option>';
+                locSelect.innerHTML += '<option value="SPG Sede R1">SPG Sede R1</option>';
+
             } else {
                 btnRain.className = "flex-1 py-2.5 px-4 text-sm font-black rounded-lg bg-white shadow-sm text-brand-600 transition-all border border-slate-200/50";
                 btnEnergy.className = "flex-1 py-2.5 px-4 text-sm font-bold rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-300/50 transition-all";
@@ -511,7 +534,21 @@
                 // Volta a cor do cabeçalho do Preview para azul
                 previewHeader.classList.remove('from-yellow-500', 'via-amber-500', 'to-orange-600', 'border-orange-700');
                 previewHeader.classList.add('from-brand-700', 'via-brand-600', 'to-brand-800', 'border-brand-900');
+
+                // Adiciona opções de local específicas para PLUVIÔMETRO
+                locSelect.innerHTML += '<option value="SPG Sede">SPG Sede</option>';
+                locSelect.innerHTML += '<option value="SPG Oásis">SPG Oásis</option>';
             }
+            
+            locSelect.innerHTML += '<option value="Outro">Outro (Digitar manualmente)</option>';
+            
+            // Restaura o valor se ele ainda existir nas opções daquele modo
+            if (Array.from(locSelect.options).some(opt => opt.value === currentLoc)) {
+                locSelect.value = currentLoc;
+            } else {
+                locSelect.value = "";
+            }
+            handleLocationChange();
             
             // Troca o array de fotos ativo dependendo do modo
             currentPhotosBase64 = isEnergy ? photosEnergy : photosRain;
@@ -1014,7 +1051,7 @@
 
                     let consumoText = "";
                     try {
-                        const energyData = await fetchWithRetry(`${SCRIPT_URL_ENERGIA}?action=calcEnergy&reading=${kwh}`);
+                        const energyData = await fetchWithRetry(`${SCRIPT_URL_ENERGIA}?action=calcEnergy&reading=${kwh}&location=${encodeURIComponent(location)}`);
 
                         if (energyData && energyData.consumo !== undefined) {
                             const consumoFmt = Number(energyData.consumo).toLocaleString('pt-BR');
@@ -1034,11 +1071,20 @@
                                 } else {
                                     consumoText += `⚖️ *O consumo manteve-se igual* à leitura anterior.\n`;
                                 }
-                                consumoText += `\n*Últimos 5 consumos:*\n${energyData.ultimos.join('\n')}\n`;
+                                // Formatar os últimos 5 consumos com a barrinha "|" igual ao print
+                                const ultimosFormatados = energyData.ultimos.map(u => u.replace(/^>\s*/, '| '));
+                                consumoText += `\n*Últimos 5 consumos:*\n${ultimosFormatados.join('\n')}\n`;
                             }
+                        } else if (energyData && energyData.erro) {
+                            consumoText += `⚠️ *Erro na planilha:* ${energyData.erro}\n`;
+                        } else if (energyData && energyData.rawText) {
+                            consumoText += `⚠️ *Aviso:* A planilha retornou erro. Atualize o link do Apps Script da Energia.\n`;
+                        } else {
+                            consumoText += `⚠️ *Aviso:* Não foi possível calcular o consumo/acumulado no momento.\n`;
                         }
                     } catch (e) {
                         console.error("Erro ao puxar consumo do Apps Script:", e);
+                        consumoText += `⚠️ *Erro de conexão:* Falha ao buscar dados da planilha.\n`;
                     }
 
                     shareText = `⚡ *LEITURA DE ENERGIA SPG* ⚡\n\n`;
@@ -1046,10 +1092,10 @@
                     shareText += `*Local:* ${location}\n`;
                     shareText += `*Responsável:* ${user}\n\n`;
                     shareText += `📋 *DADOS DA LEITURA*\n`;
-                    shareText += `*Leitura Registrada:* ${kwhFormatted}\n`;
+                    shareText += `*Leitura Registrada:* ${kwhFormatted}\n\n`;
                     
                     if (consumoText !== "") {
-                        shareText += `\n${consumoText}`;
+                        shareText += `${consumoText}`;
                     }
 
                     if (notes.trim() !== '') {
@@ -1068,7 +1114,7 @@
                     let weatherForecastText = "";
                     
                     try {
-                        const promiseAcumulado = fetchWithRetry(`${SCRIPT_URL_CHUVA}?action=calcRain&date=${encodeURIComponent(displayDate)}&mm=${mm}`)
+                        const promiseAcumulado = fetchWithRetry(`${SCRIPT_URL_CHUVA}?action=calcRain&date=${encodeURIComponent(displayDate)}&mm=${mm}&location=${encodeURIComponent(location)}`)
                             .catch(e => { console.error("Erro chuva:", e); return null; });
                             
                         // Se o clima já foi baixado no fundo, usa ele. Se não, baixa de novo.
@@ -1078,6 +1124,12 @@
 
                         if (resultAcumulado && resultAcumulado.acumuladoMes !== undefined) {
                             acumuladoText = `*Total Acumulado (${displayMonthRain}):* ${resultAcumulado.acumuladoMes} mm\n`;
+                        } else if (resultAcumulado && resultAcumulado.erro) {
+                            acumuladoText = `*Total Acumulado (${displayMonthRain}):* ⚠️ ${resultAcumulado.erro}\n`;
+                        } else if (resultAcumulado && resultAcumulado.rawText) {
+                            acumuladoText = `*Total Acumulado (${displayMonthRain}):* ⚠️ Erro (Atualize a URL do Apps Script)\n`;
+                        } else {
+                            acumuladoText = `*Total Acumulado (${displayMonthRain}):* ⚠️ Falha na conexão\n`;
                         }
                         
                         if (resultClima) {
