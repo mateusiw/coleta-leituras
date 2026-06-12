@@ -392,24 +392,19 @@
         // PWA: INSTALAÇÃO
         let deferredInstallPrompt = null;
 
-        const BRAND_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="32" fill="#0ea5e9"/><rect x="28" y="96" width="28" height="68" rx="6" fill="white"/><rect x="68" y="60" width="28" height="104" rx="6" fill="white"/><rect x="108" y="76" width="28" height="88" rx="6" fill="white"/><rect x="148" y="40" width="28" height="124" rx="6" fill="white"/></svg>`.trim();
-
-        function getBrandLogoDataUri() {
-            return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(BRAND_LOGO_SVG)}`;
-        }
+        const BRAND_LOGO_URL = 'https://i.imgur.com/z4aZwr8.png';
 
         function applyBrandAssets() {
             const themeColor = currentMode === 'energia' ? '#f59e0b' : '#0ea5e9';
             const themeMeta = document.querySelector('meta[name="theme-color"]');
             if (themeMeta) themeMeta.setAttribute('content', themeColor);
 
-            const logoUri = getBrandLogoDataUri();
             const favicon = document.getElementById('siteFavicon');
             const appleTouchIcon = document.getElementById('siteAppleTouchIcon');
             const manifestLink = document.getElementById('siteManifest');
 
-            if (favicon) favicon.href = logoUri;
-            if (appleTouchIcon) appleTouchIcon.href = logoUri;
+            if (favicon) { favicon.href = BRAND_LOGO_URL; favicon.type = 'image/png'; }
+            if (appleTouchIcon) appleTouchIcon.href = BRAND_LOGO_URL;
             if (manifestLink) {
                 const manifest = {
                     name: 'Leituras SPG',
@@ -420,8 +415,8 @@
                     background_color: '#f1f5f9',
                     theme_color: themeColor,
                     icons: [
-                        { src: logoUri, sizes: '192x192', type: 'image/svg+xml' },
-                        { src: logoUri, sizes: '512x512', type: 'image/svg+xml' }
+                        { src: BRAND_LOGO_URL, sizes: '192x192', type: 'image/png' },
+                        { src: BRAND_LOGO_URL, sizes: '512x512', type: 'image/png' }
                     ]
                 };
                 manifestLink.href = `data:application/manifest+json,${encodeURIComponent(JSON.stringify(manifest))}`;
