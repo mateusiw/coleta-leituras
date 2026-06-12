@@ -8,7 +8,7 @@
     <!-- Ícones Modernos -->
     <link rel="icon" type="image/png" href="https://img.icons8.com/fluency/512/bar-chart.png">
     <link rel="apple-touch-icon" href="https://img.icons8.com/fluency/512/bar-chart.png">
-    <link rel="manifest" href='data:application/manifest+json,{"name":"Leituras SPG","short_name":"Leituras","start_url":".","display":"standalone","background_color":"#ffffff","theme_color":"#0ea5e9"}'>
+    <link rel="manifest" href="manifest.json">
     
     <meta name="theme-color" content="#0ea5e9">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -75,6 +75,10 @@
             </div>
         </div>
         <div class="flex gap-2">
+            <button type="button" id="btnInstallApp" onclick="promptInstall()" class="hidden items-center gap-1.5 px-3 py-2 bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 rounded-lg text-xs font-bold transition-all active:scale-95" title="Instalar App">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">Instalar</span>
+            </button>
             <button type="button" onclick="showClearConfirmModal()" class="flex items-center justify-center p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-all active:scale-95" title="Limpar Formulário">
                 <i data-lucide="trash-2" class="w-4 h-4 text-red-500"></i>
             </button>
@@ -385,10 +389,55 @@
         let isSyncing = false;
         let cachedWeatherText = "";
 
+        // PWA: INSTALAÇÃO
+        let deferredInstallPrompt = null;
+
+        function applyBrandAssets() {
+            const themeColor = currentMode === 'energia' ? '#f59e0b' : '#0ea5e9';
+            const themeMeta = document.querySelector('meta[name="theme-color"]');
+            if (themeMeta) themeMeta.setAttribute('content', themeColor);
+        }
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            const btn = document.getElementById('btnInstallApp');
+            btn.classList.remove('hidden');
+            btn.classList.add('flex');
+            lucide.createIcons();
+        });
+
+        window.addEventListener('appinstalled', () => {
+            deferredInstallPrompt = null;
+            const btn = document.getElementById('btnInstallApp');
+            btn.classList.add('hidden');
+            btn.classList.remove('flex');
+        });
+
+        async function promptInstall() {
+            if (!deferredInstallPrompt) return;
+            deferredInstallPrompt.prompt();
+            const { outcome } = await deferredInstallPrompt.userChoice;
+            if (outcome === 'accepted') {
+                deferredInstallPrompt = null;
+                document.getElementById('btnInstallApp').classList.add('hidden');
+            }
+        }
+
+        // Registro do Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(err => {
+                    console.warn('SW não registrado:', err);
+                });
+            });
+        }
+
         // Inicialização
         document.addEventListener("DOMContentLoaded", () => {
             lucide.createIcons();
-            
+            applyBrandAssets();
+
             const dateInput = document.getElementById('readingDate');
             if (!dateInput.value) {
                 const today = new Date();
@@ -556,6 +605,7 @@
             renderPhotoPreviews();
             
             lucide.createIcons();
+            applyBrandAssets();
             updatePreview();
         }
 
